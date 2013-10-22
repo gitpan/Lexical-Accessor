@@ -24,7 +24,7 @@ my $meta = {
                                        requires   => {
                                                        "Eval::TypeTiny" => 0,
                                                        "Exporter::Tiny" => 0,
-                                                       "Hash::Util::FieldHash::Compat" => 0,
+                                                       "Hash::FieldHash" => 0,
                                                        "perl" => 5.008003,
                                                      },
                                      },
@@ -44,7 +44,7 @@ my $meta = {
                                      },
                       },
   "provides"       => {
-                        "Lexical::Accessor" => { file => "lib/Lexical/Accessor.pm", version => 0.001 },
+                        "Lexical::Accessor" => { file => "lib/Lexical/Accessor.pm", version => 0.002 },
                       },
   "release_status" => "stable",
   "resources"      => {
@@ -59,7 +59,7 @@ my $meta = {
                                         },
                         X_identifier => "http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/project",
                       },
-  "version"        => 0.001,
+  "version"        => 0.002,
 };
 
 my %dynamic_config;

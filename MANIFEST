@@ -12,6 +12,7 @@ README
 SIGNATURE
 dist.ini
 doap.ttl
+examples/benchmark.pl
 lib/Lexical/Accessor.pm
 t/01basic.t
 t/02moose.t

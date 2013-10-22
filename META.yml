@@ -28,14 +28,14 @@ optional_features: {}
 provides:
   Lexical::Accessor:
     file: lib/Lexical/Accessor.pm
-    version: 0.001
+    version: 0.002
 recommends:
   Sub::Name: 0
   Type::Utils: 0.026
 requires:
   Eval::TypeTiny: 0
   Exporter::Tiny: 0
-  Hash::Util::FieldHash::Compat: 0
+  Hash::FieldHash: 0
   perl: 5.008003
 resources:
   X_identifier: http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/project
@@ -43,4 +43,4 @@ resources:
   homepage: https://metacpan.org/release/Lexical-Accessor
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tobyink/p5-lexical-accessor
-version: 0.001
+version: 0.002
