@@ -4,7 +4,7 @@
       "Toby Inkster (TOBYINK) <tobyink@cpan.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Inkt::Profile::TOBYINK version 0.013, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "Dist::Inkt::Profile::TOBYINK version 0.015, CPAN::Meta::Converter version 2.120921",
    "keywords" : [],
    "license" : [
       "perl_5"
@@ -65,7 +65,7 @@
    "provides" : {
       "Lexical::Accessor" : {
          "file" : "lib/Lexical/Accessor.pm",
-         "version" : "0.003"
+         "version" : "0.004"
       }
    },
    "release_status" : "stable",
@@ -80,8 +80,9 @@
       ],
       "repository" : {
          "type" : "git",
+         "url" : "git://github.com/tobyink/p5-lexical-accessor.git",
          "web" : "https://github.com/tobyink/p5-lexical-accessor"
       }
    },
-   "version" : "0.003"
+   "version" : "0.004"
 }

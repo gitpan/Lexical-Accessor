@@ -19,3 +19,4 @@ t/02moose.t
 t/03mouse.t
 t/04moo.t
 t/05classtiny.t
+t/90subclassing.t

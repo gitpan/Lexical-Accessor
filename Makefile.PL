@@ -7,7 +7,7 @@ my $meta = {
   "abstract"       => "true private attributes for Moose/Moo/Mouse",
   "author"         => ["Toby Inkster (TOBYINK) <tobyink\@cpan.org>"],
   "dynamic_config" => 0,
-  "generated_by"   => "Dist::Inkt::Profile::TOBYINK version 0.013, CPAN::Meta::Converter version 2.120921",
+  "generated_by"   => "Dist::Inkt::Profile::TOBYINK version 0.015, CPAN::Meta::Converter version 2.120921",
   "keywords"       => [],
   "license"        => ["perl_5"],
   "meta-spec"      => {
@@ -44,7 +44,7 @@ my $meta = {
                                      },
                       },
   "provides"       => {
-                        "Lexical::Accessor" => { file => "lib/Lexical/Accessor.pm", version => 0.003 },
+                        "Lexical::Accessor" => { file => "lib/Lexical/Accessor.pm", version => 0.004 },
                       },
   "release_status" => "stable",
   "resources"      => {
@@ -55,11 +55,12 @@ my $meta = {
                         license      => ["http://dev.perl.org/licenses/"],
                         repository   => {
                                           type => "git",
+                                          url  => "git://github.com/tobyink/p5-lexical-accessor.git",
                                           web  => "https://github.com/tobyink/p5-lexical-accessor",
                                         },
                         X_identifier => "http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/project",
                       },
-  "version"        => 0.003,
+  "version"        => 0.004,
 };
 
 my %dynamic_config;
@@ -71,6 +72,7 @@ my %WriteMakefileArgs = (
 	VERSION    => $meta->{version},
 	EXE_FILES  => [ map $_->{file}, values %{ $meta->{x_provides_scripts} || {} } ],
 	NAME       => do { my $n = $meta->{name}; $n =~ s/-/::/g; $n },
+	test       => { TESTS => "t/*.t" },
 	%dynamic_config,
 );
 
