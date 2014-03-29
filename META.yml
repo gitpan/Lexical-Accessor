@@ -28,7 +28,10 @@ optional_features: {}
 provides:
   Lexical::Accessor:
     file: lib/Lexical/Accessor.pm
-    version: 0.005
+    version: 0.006
+  Sub::Accessor::Small:
+    file: lib/Sub/Accessor/Small.pm
+    version: 0.006
 recommends:
   Sub::Name: 0
   Type::Utils: 0.026
@@ -43,4 +46,4 @@ resources:
   homepage: https://metacpan.org/release/Lexical-Accessor
   license: http://dev.perl.org/licenses/
   repository: git://github.com/tobyink/p5-lexical-accessor.git
-version: 0.005
+version: 0.006

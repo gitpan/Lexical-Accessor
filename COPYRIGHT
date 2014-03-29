@@ -5,6 +5,7 @@ Source: https://metacpan.org/release/Lexical-Accessor
 
 Files: README
  lib/Lexical/Accessor.pm
+ lib/Sub/Accessor/Small.pm
  t/01basic.t
  t/02moose.t
  t/03mouse.t

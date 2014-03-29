@@ -153,15 +153,6 @@ DESCRIPTION
         `documentation`, `definition_context`
             Don't do anything, but are allowed; effectively inline comments.
 
-    `HAS_SUB_NAME`
-        Indicates the availability of Sub::Name which Lexical::Accessor will
-        use if available to name coderefs for the benefit of stack traces.
-
-        It's also used to name any `builder` subs which are automatically
-        installed into your class' namespace.
-
-        This function is not exported.
-
   Class Methods
     `lexical_has`
         This function may also be called as a class method.

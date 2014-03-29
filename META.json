@@ -65,7 +65,11 @@
    "provides" : {
       "Lexical::Accessor" : {
          "file" : "lib/Lexical/Accessor.pm",
-         "version" : "0.005"
+         "version" : "0.006"
+      },
+      "Sub::Accessor::Small" : {
+         "file" : "lib/Sub/Accessor/Small.pm",
+         "version" : "0.006"
       }
    },
    "release_status" : "stable",
@@ -84,5 +88,5 @@
          "web" : "https://github.com/tobyink/p5-lexical-accessor"
       }
    },
-   "version" : "0.005"
+   "version" : "0.006"
 }
