@@ -5,18 +5,18 @@ no warnings qw( void once uninitialized );
 
 package Sub::Accessor::Small;
 
-use Carp qw( carp croak );
-use Eval::TypeTiny ();
-use Exporter::Tiny ();
-use Hash::FieldHash qw( fieldhash );
-use Scalar::Util qw( blessed reftype );
+use Carp             qw( carp croak );
+use Eval::TypeTiny   qw();
+use Exporter::Tiny   qw();
+use Hash::FieldHash  qw( fieldhash );
+use Scalar::Util     qw( blessed reftype );
 
 BEGIN {
 	*HAS_SUB_NAME = eval { require Sub::Name } ? sub(){1} : sub(){0};
 };
 
 our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.006';
+our $VERSION   = '0.007';
 our @ISA       = qw/ Exporter::Tiny /;
 
 fieldhash( our %FIELDS );
@@ -26,96 +26,93 @@ sub _generate_has : method
 	my $me = shift;
 	my (undef, undef, $export_opts) = @_;
 	
-	my $code = sub { $me->has($export_opts, @_) };
-	$code = Sub::Name::subname("$me\::has", $code)
-		if HAS_SUB_NAME;
+	my $code = sub
+	{
+		my $attr = $me->new_from_has($export_opts, @_);
+		$attr->install_accessors;
+	};
+	
+	$code = Sub::Name::subname("$me\::has", $code) if HAS_SUB_NAME;
 	return $code;
 }
 
-my $uniq = 0;
+{
+	my $uniq = 0;
+	sub new_from_has : method
+	{
+		my $me = shift;
+		my $export_opts = ref($_[0]) eq 'HASH' ? shift(@_) : {};
+		my ($name, %opts) = (@_%2) ? @_ : (undef, @_);
+		
+		my $package;
+		$package = $export_opts->{into}
+			if defined($export_opts->{into}) && !ref($export_opts->{into});
+		
+		$me->new(
+			slot    => $name,
+			id      => $uniq++,
+			_export => $export_opts,
+			($package ? (package => $package) : ()),
+			%opts,
+		);
+	}
+}
+
 sub has : method
 {
 	my $me = shift;
-	my $export_opts = ref($_[0]) eq 'HASH' ? shift(@_) : {};
-	my ($name, %opts) = (@_%2) ? @_ : (undef, @_);
+	my $attr = $me->new_from_has(@_);
+	$attr->install_accessors;
+}
+
+sub new : method
+{
+	my $me = shift;
+	my (%opts) = @_;
+	my $self = bless(\%opts, $me);
+	$self->canonicalize_opts;
+	return $self;
+}
+
+sub install_accessors : method
+{
+	my $me = shift;
 	
-	# Massage %opts
-	$opts{_export} = $export_opts;
-	$opts{package} = $export_opts->{into} if defined($export_opts->{into}) && !ref($export_opts->{into});
-	$me->_canonicalize_opts($name, ++$uniq, \%opts);
-	
-	my @return;
-	my $is = $opts{is};
-	
-	if (exists $opts{clearer})
+	for my $type (qw( accessor reader writer predicate clearer ))
 	{
-		$me->_install_coderef(
-			$opts{clearer},
-			$me->_clearer($name, $uniq, \%opts),
-			$name, $uniq, \%opts,
-		);
+		next unless defined $me->{$type};
+		$me->install_coderef($me->{$type}, $me->$type);
 	}
 	
-	if (exists $opts{predicate})
+	if (defined $me->{handles})
 	{
-		$me->_install_coderef(
-			$opts{predicate},
-			$me->_predicate($name, $uniq, \%opts),
-			$name, $uniq, \%opts,
-		);
-	}
-	
-	if (exists $opts{handles})
-	{
-		my @pairs = $me->_expand_handles($opts{handles}, $name, $uniq, \%opts);
+		my @pairs = $me->expand_handles;
 		while (@pairs)
 		{
 			my ($target, $method) = splice(@pairs, 0, 2);
-			$me->_install_coderef(
-				$target,
-				$me->_handles($method, $name, $uniq, \%opts),
-				$name, $uniq, \%opts,
-			);
+			$me->install_coderef($target, $me->handles($method));
 		}
 	}
 	
-	if (exists $opts{reader} or $is eq 'ro' or $is eq 'rwp')
-	{
-		my $reader = $me->_reader($name, $uniq, \%opts);
-		$me->_install_coderef($opts{reader}, $reader, $name, $uniq, \%opts)
-			if exists $opts{reader};
-		push @return, $reader if ($is eq 'ro' or $is eq 'rwp');
-	}
-	
-	if (exists $opts{writer} or $is eq 'rwp')
-	{
-		my $writer = $me->_writer($name, $uniq, \%opts);
-		$me->_install_coderef($opts{writer}, $writer, $name, $uniq, \%opts)
-			if exists $opts{writer};
-		push @return, $writer if $is eq 'rwp';
-	}
-	
-	if (exists $opts{accessor} or $is eq 'rw')
-	{
-		my $accessor = $me->_accessor($name, $uniq, \%opts);
-		$me->_install_coderef($opts{accessor}, $accessor, $name, $uniq, \%opts)
-			if exists $opts{accessor};
-		push @return, $accessor;
-	}
-	
+	my @return =
+		$me->{is} eq 'ro'   ? ($me->{reader}) :
+		$me->{is} eq 'rw'   ? ($me->{accessor}) :
+		$me->{is} eq 'rwp'  ? ($me->{reader}, $me->{writer}) :
+		$me->{is} eq 'lazy' ? ($me->{reader}) :
+		();
 	wantarray ? @return : $return[0];
 }
 
-sub _install_coderef
+sub install_coderef
 {
-	shift;
-	my ($target, $coderef, $name, $uniq, $opts) = @_;
+	my $me = shift;
+	my ($target, $coderef) = @_;
 	
 	return unless defined $target;
 	
 	if (!ref $target and $target =~ /\A[^\W0-9]\w+\z/)
 	{
-		my $name = "$opts->{package}\::$target";
+		my $name = "$me->{package}\::$target";
 		$coderef = Sub::Name::subname($name, $coderef) if HAS_SUB_NAME;
 		no strict qw(refs);
 		*$name = $coderef;
@@ -136,221 +133,279 @@ sub _install_coderef
 	croak "Expected installation target to be a reference to an undefined scalar; got $target";
 }
 
-sub _expand_handles
-{
-	shift;
-	my ($handles, $name, $uniq, $opts) = @_;
-	
-	if (ref($handles) eq q(ARRAY))
-	{
-		return @$handles;
-	}
-	
-	croak "Expected delegations to be a reference to an array; got $handles";
-}
-
-sub _canonicalize_opts : method
+sub expand_handles
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
 	
-	if ($opts->{is} eq 'rw')
+	if (ref($me->{handles}) eq q(ARRAY))
 	{
-		$opts->{accessor} = $name
-			if !exists($opts->{accessor});
+		return map ($_=>$_), @{$me->{handles}};
 	}
-	elsif ($opts->{is} eq 'ro')
+	elsif (ref($me->{handles}) eq q(HASH))
 	{
-		$opts->{reader} = $name
-			if !exists($opts->{reader});
-	}
-	elsif ($opts->{is} eq 'rwp')
-	{
-		$opts->{reader} = $name
-			if !exists($opts->{reader});
-		$opts->{writer} = "_set_$name"
-			if !exists($opts->{writer});
-	}
-	elsif ($opts->{is} eq 'lazy')
-	{
-		$opts->{reader} = $name
-			if !exists($opts->{reader});
-		$opts->{lazy} = 1
-			if !exists($opts->{lazy});
-		$opts->{builder} = 1
-			unless $opts->{builder} || $opts->{default};
+		return %{$me->{handles}};
 	}
 	
-	croak("No accessors defined")
-		unless defined($opts->{reader}) || defined($opts->{writer}) || defined($opts->{accessor});
+	croak "Expected delegations to be a reference to an array or hash; got $me->{handles}";
+}
+
+{
+	my %one = (
+		accessor   => [qw/ %s %s /],
+		reader     => [qw/ get_%s _get%s /],
+		writer     => [qw/ set_%s _set%s /],
+		predicate  => [qw/ has_%s _has%s /],
+		clearer    => [qw/ clear_%s _clear%s /],
+		trigger    => [qw/ _trigger_%s _trigger_%s /],
+		builder    => [qw/ _builder_%s _builder_%s /],
+	);
 	
-	croak("Initializers are not supported") if $opts->{initializer};
-	croak("Traits are not supported") if $opts->{traits};
-	croak("The lazy_build option is not supported") if $opts->{lazy_build};
-	
-	if (defined $opts->{default} and not ref $opts->{default})
+	sub canonicalize_1 : method
 	{
-		my $value = $opts->{default};
-		$opts->{default} = sub { $value };
+		my $me = shift;
+		
+		my $is_private = ($me->{slot} =~ /\A_/) ? 1 : 0;
+		
+		for my $type (keys %one)
+		{
+			next if !exists($me->{$type});
+			next if ref($me->{$type});
+			next if $me->{$type} ne 1;
+			
+			croak("Cannot interpret $type=>1 because attribute has no name defined")
+				if !defined $me->{slot};
+			
+			$me->{$type} = sprintf($one{$type}[$is_private], $me->{slot});
+		}
 	}
 	
-	if (defined $opts->{default} and ref $opts->{default} ne 'CODE')
+	sub canonicalize_builder : method
 	{
-		croak("Invalid default; expected a CODE ref");
+		my $me = shift;
+		my $name = $me->{slot};
+			
+		if (ref $me->{builder} eq 'CODE')
+		{
+			HAS_SUB_NAME or do { require Sub::Name };
+			
+			my $code = $me->{builder};
+			defined($name) && defined($me->{package})
+				or croak("Invalid builder; expected method name as string");
+			
+			my $is_private = ($name =~ /\A_/) ? 1 : 0;
+			
+			my $subname    = sprintf($one{builder}[$is_private], $name);
+			my $fq_subname = "$me->{package}\::$name";
+			$me->_exporter_install_sub(
+				$subname,
+				{},
+				$me->{_export},
+				Sub::Name::subname($fq_subname, $code),
+			);
+		}
+	}
+}
+
+sub canonicalize_is : method
+{
+	my $me = shift;
+	my $name = $me->{slot};
+	
+	if ($me->{is} eq 'rw')
+	{
+		$me->{accessor} = $name
+			if !exists($me->{accessor}) and defined $name;
+	}
+	elsif ($me->{is} eq 'ro')
+	{
+		$me->{reader} = $name
+			if !exists($me->{reader}) and defined $name;
+	}
+	elsif ($me->{is} eq 'rwp')
+	{
+		$me->{reader} = $name
+			if !exists($me->{reader}) and defined $name;
+		$me->{writer} = "_set_$name"
+			if !exists($me->{writer}) and defined $name;
+	}
+	elsif ($me->{is} eq 'lazy')
+	{
+		$me->{reader} = $name
+			if !exists($me->{reader}) and defined $name;
+		$me->{lazy} = 1
+			if !exists($me->{lazy});
+		$me->{builder} = 1
+			unless $me->{builder} || $me->{default};
+	}
+}
+
+sub canonicalize_default : method
+{
+	my $me = shift;
+	return unless exists $me->{default};
+	
+	unless (ref $me->{default})
+	{
+		my $value = $me->{default};
+		$me->{default} = sub { $value };
 	}
 	
-	if (my $does = $opts->{does})
+	croak("Invalid default; expected a CODE ref")
+		unless ref $me->{default} ne 'CODE';
+}
+
+sub canonicalize_isa : method
+{
+	my $me = shift;
+	
+	if (my $does = $me->{does})
 	{
-		$opts->{isa} ||= sub {
-			blessed($_[0]) && $_[0]->DOES($does)
-		};
+		$me->{isa} ||= sub { blessed($_[0]) && $_[0]->DOES($does) };
 	}
 	
-	if (defined $opts->{isa} and not ref $opts->{isa})
+	if (defined $me->{isa} and not ref $me->{isa})
 	{
-		my $type_name = $opts->{isa};
+		my $type_name = $me->{isa};
 		eval { require Type::Utils }
 			or croak("Missing requirement; type constraint strings require Type::Utils");
 		
-		$opts->{isa} = $opts->{package}
-			? Type::Utils::dwim_type($type_name, for => $opts->{package})
+		$me->{isa} = $me->{package}
+			? Type::Utils::dwim_type($type_name, for => $me->{package})
 			: Type::Utils::dwim_type($type_name);
-	}
-	
-	if (ref $opts->{builder} eq 'CODE')
-	{
-		HAS_SUB_NAME or do { require Sub::Name };
-		
-		my $code = $opts->{builder};
-		defined($name) && defined($opts->{package})
-			or croak("Invalid builder; expected method name as string");
-		
-		my $qname = "$opts->{package}\::_build_$name";
-		$me->_exporter_install_sub(
-			"_build_$name",
-			{},
-			$opts->{_export},
-			Sub::Name::subname($qname, $code),
-		);
-	}
-	elsif ($opts->{builder} eq '1')
-	{
-		defined($name)
-			or croak("Invalid builder; cannot determine method name");
-		$opts->{builder} = "_build_$name";
-	}
-	
-	if (defined $opts->{trigger} and not ref $opts->{trigger})
-	{
-		my $method_name = $opts->{trigger};
-		$opts->{trigger} = sub { my $self = shift; $self->$method_name(@_) };
 	}
 }
 
-sub _accessor_kind : method
+sub canonicalize_trigger : method
+{
+	my $me = shift;
+	
+	if (defined $me->{trigger} and not ref $me->{trigger})
+	{
+		my $method_name = $me->{trigger};
+		$me->{trigger} = sub { my $self = shift; $self->$method_name(@_) };
+	}
+}
+
+sub canonicalize_opts : method
+{
+	my $me = shift;
+	
+	croak("Initializers are not supported") if $me->{initializer};
+	croak("Traits are not supported") if $me->{traits};
+	croak("The lazy_build option is not supported") if $me->{lazy_build};
+	
+	$me->canonicalize_1;
+	$me->canonicalize_is;
+	$me->canonicalize_isa;
+	$me->canonicalize_default;
+	$me->canonicalize_builder;
+	$me->canonicalize_trigger;
+}
+
+sub accessor_kind : method
 {
 	return 'small';
 }
 
-sub _inline_to_coderef : method
+sub inline_to_coderef : method
 {
 	my $me = shift;
-	my ($method_type, $code, $name, $uniq, $opts) = @_;
-	
-	my $kind = $me->_accessor_kind;
+	my ($method_type, $code) = @_;
+
+	my $kind = $me->accessor_kind;
 	my $src  = sprintf(q[sub { %s }], $code);
-	my $desc = defined($name)
-		? sprintf('%s %s for %s', $kind, $method_type, $name)
+	my $desc = defined($me->{slot})
+		? sprintf('%s %s for %s', $kind, $method_type, $me->{slot})
 		: sprintf('%s %s', $kind, $method_type);
 	# warn "#### $desc\n$src\n";
 	
 	return Eval::TypeTiny::eval_closure(
 		source      => $src,
-		environment => $opts->{inline_environment},
+		environment => $me->{inline_environment},
 		description => $desc,
 	);
 }
 
-sub _clearer : method
+sub clearer : method
 {
 	my $me = shift;
 	
-	$me->_inline_to_coderef(
-		clearer => $me->_inline_clearer(@_),
-		@_,
+	$me->inline_to_coderef(
+		clearer => $me->inline_clearer,
 	);
 }
 
-sub _inline_clearer : method
+sub inline_clearer : method
 {
 	my $me = shift;
+	
 	sprintf(
 		q[ delete(%s) ],
-		$me->_inline_access(@_),
+		$me->inline_access,
 	);
 }
 
-sub _inline_access : method
+sub inline_access : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
+	
 	sprintf(
 		q[ $Sub::Accessor::Small::FIELDS{$_[0]}{%d} ],
-		$uniq,
+		$me->{id},
 	);
 }
 
-sub _inline_access_w : method
+sub inline_access_w : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts, $expr) = @_;
+	my ($expr) = @_;
+	
 	sprintf(
 		q[ %s = %s ],
-		$me->_inline_access($name, $uniq, $opts),
+		$me->inline_access,
 		$expr,
 	);
 }
 
-sub _predicate : method
+sub predicate : method
 {
 	my $me = shift;
 	
-	$me->_inline_to_coderef(
-		predicate => $me->_inline_predicate(@_),
-		@_,
+	$me->inline_to_coderef(
+		predicate => $me->inline_predicate,
 	);
 }
 
-sub _inline_predicate : method
+sub inline_predicate : method
 {
 	my $me = shift;
+	
 	sprintf(
 		q[ exists(%s) ],
-		$me->_inline_access(@_),
+		$me->inline_access,
 	);
 }
 
-sub _handles : method
+sub handles : method
 {
 	my $me = shift;
-	my ($method, $name, $uniq, $opts) = @_;
+	my ($method) = @_;
 	
-	$me->_inline_to_coderef(
-		'delegated method' => $me->_inline_handles(@_),
-		@_[1 .. 3],
+	$me->inline_to_coderef(
+		'delegated method' => $me->inline_handles,
 	);
 }
 
 my $handler_uniq = 0;
-sub _inline_handles : method
+sub inline_handles : method
 {
 	my $me = shift;
-	my ($method, $name, $uniq, $opts) = @_;
+	my ($method) = @_;
 	
-	my $get = $me->_inline_access($name, $uniq, $opts);
+	my $get = $me->inline_access;
 	
 	my $varname = sprintf('$handler_%d', ++$handler_uniq);
-	$opts->{inline_environment}{$varname} = \($method);
+	$me->{inline_environment}{$varname} = \($method);
 	
 	my $death = 'Scalar::Util::blessed($h) or Carp::croak("Expected blessed object to delegate to; got $h")';
 	
@@ -358,7 +413,7 @@ sub _inline_handles : method
 	{
 		return sprintf(
 			q[ %s; my $h = %s; %s; shift; my ($m, @a) = @%s; $h->$m(@a, @_) ],
-			$me->_inline_default($name, $uniq, $opts),
+			$me->inline_default,
 			$get,
 			$death,
 			$varname,
@@ -368,7 +423,7 @@ sub _inline_handles : method
 	{
 		return sprintf(
 			q[ %s; my $h = %s; %s; shift; $h->%s(@_) ],
-			$me->_inline_default($name, $uniq, $opts),
+			$me->inline_default,
 			$get,
 			$death,
 			$varname,
@@ -376,14 +431,13 @@ sub _inline_handles : method
 	}
 }
 
-sub _inline_get : method
+sub inline_get : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
 	
-	my $get = $me->_inline_access(@_);
+	my $get = $me->inline_access;
 	
-	if ($opts->{auto_deref})
+	if ($me->{auto_deref})
 	{
 		$get = sprintf(
 			q[ do { my $x = %s; wantarray ? (ref($x) eq 'ARRAY' ? @$x : ref($x) eq 'HASH' ? %$x : $x ) : $x } ],
@@ -394,31 +448,30 @@ sub _inline_get : method
 	return $get;
 }
 
-sub _inline_default : method
+sub inline_default : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
 	
-	if ($opts->{lazy})
+	if ($me->{lazy})
 	{
-		my $get = $me->_inline_access(@_);
+		my $get = $me->inline_access;
 		
-		if ($opts->{default})
+		if ($me->{default})
 		{
-			$opts->{inline_environment}{'$default'} = \($opts->{default});
+			$me->{inline_environment}{'$default'} = \($me->{default});
 			
 			return sprintf(
 				q[ %s unless %s; ],
-				$me->_inline_access_w($name, $uniq, $opts, q[$default->($_[0])]),
-				$me->_inline_predicate($name, $uniq, $opts),
+				$me->inline_access_w( q[$default->($_[0])] ),
+				$me->inline_predicate,
 			);
 		}
-		elsif (defined $opts->{builder})
+		elsif (defined $me->{builder})
 		{
 			return sprintf(
 				q[ %s unless %s; ],
-				$me->_inline_access_w($name, $uniq, $opts, q($_[0]->).$opts->{builder}),
-				$me->_inline_predicate($name, $uniq, $opts),
+				$me->inline_access_w( q($_[0]->) . $me->{builder} ),
+				$me->inline_predicate,
 			);
 		}
 	}
@@ -426,149 +479,128 @@ sub _inline_default : method
 	return '';
 }
 
-sub _reader : method
+sub reader : method
 {
 	my $me = shift;
 	
-	$me->_inline_to_coderef(
-		reader => $me->_inline_reader(@_),
-		@_,
+	$me->inline_to_coderef(
+		reader => $me->inline_reader,
 	);
 }
 
-sub _inline_reader : method
+sub inline_reader : method
 {
 	my $me = shift;
 	
 	join('',
-		$me->_inline_default(@_),
-		$me->_inline_get(@_),
+		$me->inline_default,
+		$me->inline_get,
 	);
 }
 
-sub _writer : method
+sub writer : method
 {
 	my $me = shift;
 	
-	$me->_inline_to_coderef(
-		writer => $me->_inline_writer(@_),
-		@_,
+	$me->inline_to_coderef(
+		writer => $me->inline_writer,
 	);
 }
 
-sub _inline_writer : method
+sub inline_writer : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
 	
-	my $get    = $me->_inline_access(@_);
-	my $coerce = $me->_inline_type_coercion('$_[1]', @_);
+	my $get    = $me->inline_access;
+	my $coerce = $me->inline_type_coercion('$_[1]');
 	
 	if ($coerce eq '$_[1]')  # i.e. no coercion
 	{
-		if (!$opts->{trigger} and !$opts->{weak_ref})
+		if (!$me->{trigger} and !$me->{weak_ref})
 		{
-			return $me->_inline_access_w(
-				$name, $uniq, $opts,
-				$me->_inline_type_assertion('$_[1]', @_),
+			return $me->inline_access_w(
+				$me->inline_type_assertion('$_[1]'),
 			);
 		}
 		
 		return sprintf(
 			'%s; %s; %s; %s; %s',
-			$me->_inline_type_assertion('$_[1]', @_),
-			$me->_inline_trigger('$_[1]', $get, @_),
-			$me->_inline_access_w(
-				$name, $uniq, $opts,
-				'$_[1]',
-			),
-			$me->_inline_weaken(@_),
-			$me->_inline_get(@_),
+			$me->inline_type_assertion('$_[1]'),
+			$me->inline_trigger('$_[1]', $get),
+			$me->inline_access_w('$_[1]'),
+			$me->inline_weaken,
+			$me->inline_get,
 		);
 	}
 	
 	sprintf(
 		'my $val = %s; %s; %s; %s; %s; $val',
 		$coerce,
-		$me->_inline_type_assertion('$val', @_),
-		$me->_inline_trigger('$val', $get, @_),
-		$me->_inline_access_w(
-			$name, $uniq, $opts,
-			'$val',
-		),
-		$me->_inline_weaken(@_),
+		$me->inline_type_assertion('$val'),
+		$me->inline_trigger('$val', $get),
+		$me->inline_access_w('$val'),
+		$me->inline_weaken,
 	);
 }
 
-sub _accessor : method
+sub accessor : method
 {
 	my $me = shift;
 	
-	$me->_inline_to_coderef(
-		accessor => $me->_inline_accessor(@_),
-		@_,
+	$me->inline_to_coderef(
+		accessor => $me->inline_accessor,
 	);
 }
 
-sub _inline_accessor : method
+sub inline_accessor : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
-	
-	my $get    = $me->_inline_access(@_);
-	my $coerce = $me->_inline_type_coercion('$_[1]', @_);
+
+	my $get    = $me->inline_access;
+	my $coerce = $me->inline_type_coercion('$_[1]');
 	
 	if ($coerce eq '$_[1]')  # i.e. no coercion
 	{
-		if (!$opts->{trigger} and !$opts->{weak_ref})
+		if (!$me->{trigger} and !$me->{weak_ref})
 		{
 			return sprintf(
 				'(@_ > 1) ? (%s) : %s',
-				$me->_inline_access_w(
-					$name, $uniq, $opts,
-					$me->_inline_type_assertion('$_[1]', @_),
-				),
+				$me->inline_access_w( $me->inline_type_assertion('$_[1]') ),
 				$get,
 			);
 		}
 		
 		return sprintf(
 			'if (@_ > 1) { %s; %s; %s; %s }; %s',
-			$me->_inline_type_assertion('$_[1]', @_),
-			$me->_inline_trigger('$_[1]', $get, @_),
-			$me->_inline_access_w(
-				$name, $uniq, $opts,
-				'$_[1]',
-			),
-			$me->_inline_weaken(@_),
-			$me->_inline_get(@_),
+			$me->inline_type_assertion('$_[1]'),
+			$me->inline_trigger('$_[1]', $get),
+			$me->inline_access_w('$_[1]'),
+			$me->inline_weaken,
+			$me->inline_get,
 		);
 	}
 	
 	sprintf(
 		'if (@_ > 1) { my $val = %s; %s; %s; %s; %s }; %s',
 		$coerce,
-		$me->_inline_type_assertion('$val', @_),
-		$me->_inline_trigger('$val', $get, @_),
-		$me->_inline_access_w(
-			$name, $uniq, $opts,
-			'$val',
-		),
-		$me->_inline_weaken(@_),
-		$me->_inline_get(@_),
+		$me->inline_type_assertion('$val'),
+		$me->inline_trigger('$val', $get),
+		$me->inline_access_w('$val'),
+		$me->inline_weaken,
+		$me->inline_get,
 	);
 }
 
-sub _inline_type_coercion : method
+sub inline_type_coercion : method
 {
 	my $me = shift;
-	my ($var, $name, $uniq, $opts) = @_;
+	my ($var) = @_;
 	
-	my $coercion = $opts->{coerce} or return $var;
+	my $coercion = $me->{coerce} or return $var;
 	
 	unless (ref $coercion)
 	{
-		my $type = $opts->{isa};
+		my $type = $me->{isa};
 		
 		if (blessed($type) and $type->can('coercion'))
 		{
@@ -599,7 +631,7 @@ sub _inline_type_coercion : method
 	}
 	
 	# Otherwise need to close over $coerce
-	$opts->{inline_environment}{'$coercion'} = \$coercion;
+	$me->{inline_environment}{'$coercion'} = \$coercion;
 	
 	if ( blessed($coercion)
 	and $coercion->can('coerce') )
@@ -610,12 +642,12 @@ sub _inline_type_coercion : method
 	return sprintf('$coercion->(%s)', $var);
 }
 
-sub _inline_type_assertion : method
+sub inline_type_assertion : method
 {
 	my $me = shift;
-	my ($var, $name, $uniq, $opts) = @_;
+	my ($var) = @_;
 	
-	my $type = $opts->{isa} or return $var;
+	my $type = $me->{isa} or return $var;
 	
 	if ( blessed($type)
 	and $type->isa('Type::Tiny')
@@ -631,7 +663,7 @@ sub _inline_type_assertion : method
 	}
 	
 	# Otherwise need to close over $type
-	$opts->{inline_environment}{'$type'} = \$type;
+	$me->{inline_environment}{'$type'} = \$type;
 	
 	# non-Type::Tiny but still supports inlining
 	if ( blessed($type)
@@ -655,28 +687,27 @@ sub _inline_type_assertion : method
 	return sprintf('$type->(%s) ? %s : Carp::croak("Value %s failed type constraint check")', $var, $var, $var);
 }
 
-sub _inline_weaken : method
+sub inline_weaken : method
 {
 	my $me = shift;
-	my ($name, $uniq, $opts) = @_;
 	
-	return '' unless $opts->{weak_ref};
+	return '' unless $me->{weak_ref};
 	
 	sprintf(
 		q[ Scalar::Util::weaken(%s) if ref(%s) ],
-		$me->_inline_access(@_),
-		$me->_inline_access(@_),
+		$me->inline_access,
+		$me->inline_access,
 	);
 }
 
-sub _inline_trigger : method
+sub inline_trigger : method
 {
 	my $me = shift;
-	my ($new, $old, $name, $uniq, $opts) = @_;
+	my ($new, $old) = @_;
 	
-	my $trigger = $opts->{trigger} or return '';
+	my $trigger = $me->{trigger} or return '';
 	
-	$opts->{inline_environment}{'$trigger'} = \$trigger;
+	$me->{inline_environment}{'$trigger'} = \$trigger;
 	return sprintf('$trigger->($_[0], %s, %s)', $new, $old);
 }
 

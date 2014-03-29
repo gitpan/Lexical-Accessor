@@ -44,8 +44,8 @@ my $meta = {
                                      },
                       },
   "provides"       => {
-                        "Lexical::Accessor"    => { file => "lib/Lexical/Accessor.pm", version => 0.006 },
-                        "Sub::Accessor::Small" => { file => "lib/Sub/Accessor/Small.pm", version => 0.006 },
+                        "Lexical::Accessor"    => { file => "lib/Lexical/Accessor.pm", version => 0.007 },
+                        "Sub::Accessor::Small" => { file => "lib/Sub/Accessor/Small.pm", version => 0.007 },
                       },
   "release_status" => "stable",
   "resources"      => {
@@ -61,7 +61,7 @@ my $meta = {
                                         },
                         X_identifier => "http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/project",
                       },
-  "version"        => 0.006,
+  "version"        => 0.007,
 };
 
 my %dynamic_config;

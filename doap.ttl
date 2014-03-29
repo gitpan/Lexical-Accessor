@@ -28,7 +28,7 @@
 	doap:maintainer      <http://purl.org/NET/cpan-uri/person/tobyink>;
 	doap:name            "Lexical-Accessor";
 	doap:programming-language "Perl";
-	doap:release         <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-001>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-002>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-003>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-004>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-005>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-006>;
+	doap:release         <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-001>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-002>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-003>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-004>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-005>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-006>, <http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-007>;
 	doap:repository      [
 		a doap:GitRepository;
 		doap:browse <https://github.com/tobyink/p5-lexical-accessor>;
@@ -128,6 +128,20 @@
 	doap-changeset:released-by <http://purl.org/NET/cpan-uri/person/tobyink>;
 	doap:file-release    <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/Lexical-Accessor-0.006.tar.gz>;
 	doap:revision        "0.006"^^xsd:string.
+
+<http://purl.org/NET/cpan-uri/dist/Lexical-Accessor/v_0-007>
+	a                    doap:Version;
+	dc:identifier        "Lexical-Accessor-0.007"^^xsd:string;
+	dc:issued            "2014-03-29"^^xsd:date;
+	doap-changeset:changeset [
+		doap-changeset:item [
+			a doap-changeset:Change;
+			rdfs:label "Much cleaned up Sub::Accessor::Small.";
+		];
+	];
+	doap-changeset:released-by <http://purl.org/NET/cpan-uri/person/tobyink>;
+	doap:file-release    <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/Lexical-Accessor-0.007.tar.gz>;
+	doap:revision        "0.007"^^xsd:string.
 
 <http://purl.org/NET/cpan-uri/person/tobyink>
 	a                    foaf:Person;

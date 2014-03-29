@@ -33,12 +33,11 @@ BEGIN {
 	$INC{'Local/MyAccessor.pm'} = __FILE__;
 	
 	# Store in a hashref instead of inside-out.
-	sub _inline_access {
+	sub inline_access {
 		my $me = shift;
-		my ($name, $uniq, $opts) = @_;
 		sprintf(
 			q[ $_[0]{%s} ],
-			$name,
+			$me->{slot},
 		);
 	}
 };
