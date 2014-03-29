@@ -16,7 +16,7 @@ BEGIN {
 };
 
 our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.007';
+our $VERSION   = '0.008';
 our @ISA       = qw/ Exporter::Tiny /;
 
 fieldhash( our %FIELDS );
@@ -251,7 +251,7 @@ sub canonicalize_default : method
 	}
 	
 	croak("Invalid default; expected a CODE ref")
-		unless ref $me->{default} ne 'CODE';
+		unless ref $me->{default} eq 'CODE';
 }
 
 sub canonicalize_isa : method

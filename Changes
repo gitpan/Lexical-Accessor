@@ -6,6 +6,11 @@ Home page:    <https://metacpan.org/release/Lexical-Accessor>
 Bug tracker:  <http://rt.cpan.org/Dist/Display.html?Queue=Lexical-Accessor>
 Maintainer:   Toby Inkster (TOBYINK) <tobyink@cpan.org>
 
+0.008	2014-03-29
+
+ [ Bug Fixes ]
+ - Fix attribute defaults.
+
 0.007	2014-03-29
 
  - Much cleaned up Sub::Accessor::Small.
